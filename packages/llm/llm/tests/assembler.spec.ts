@@ -110,6 +110,17 @@ describe('BlockAssembler', () => {
     ])
   })
 
+  it('uses the generated id fallback when the model stream emits an empty id', () => {
+    const assembler = new BlockAssembler()
+    // A malformed tool-call-delta carrying an empty-string id (observed from a
+    // stream that emitted an empty tool_use id) must not propagate; the
+    // brandString fallback fires exactly like the absent-id case.
+    assembler.push({ type: 'tool-call-delta', index: 0, id: ToolCallId(''), name: 'echo', argumentsDelta: '{}' })
+    expect(assembler.blocks()).toEqual([
+      { type: 'tool-call', id: ToolCallId('call-0'), name: 'echo', arguments: '{}' },
+    ])
+  })
+
   it('exposes usage via the getter when a usage chunk was received', () => {
     const assembler = new BlockAssembler()
     assembler.push({ type: 'text-delta', index: 0, text: 'msg' })

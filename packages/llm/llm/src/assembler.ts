@@ -69,7 +69,11 @@ export class BlockAssembler {
       case 'tool-call-delta': {
         const partial = this.ensure(chunk.index, 'tool-call')
         if (partial.block) return // closed by block-end; ignore stragglers
-        partial.toolCallId = chunk.id
+        // An empty-string id (a malformed model stream, e.g. an empty tool_use id)
+        // is treated like an absent id so the brandString fallback in assemble()
+        // fires; otherwise the empty id propagates and deadlocks the matching
+        // tool/result admission.
+        if (chunk.id) partial.toolCallId = chunk.id
         if (chunk.name) partial.toolCallName = chunk.name
         partial.toolCallArguments += chunk.argumentsDelta
         return

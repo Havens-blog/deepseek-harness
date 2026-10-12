@@ -110,3 +110,26 @@ export function assertV4ToolResultMessage(event: SessionFormatEvent): void {
     throw new SessionFormatError(`${subject} carries error metadata for a non-error tool result`)
   }
 }
+
+/**
+ * Validate a native V4 tool/call row at admission against the degenerate shape
+ * that deadlocks its matching tool/result: a present-but-empty `callId`.
+ *
+ * Admission stays lenient for rows that omit `callId` (opacity and recovery
+ * payloads, see retired-content.spec.ts); restore enforces the full
+ * present-and-nonempty requirement via the tool-call relationship. This guard
+ * fails loud only on the clearly-invalid empty-string `callId` so a malformed
+ * tool call is rejected before its result can mismatch.
+ * @param event - canonical V4 event.
+ * @throws {SessionFormatError} when `data.callId` is present but not a nonempty string.
+ */
+export function assertV4ToolCallMessage(event: SessionFormatEvent): void {
+  if (event.type !== 'tool/call') return
+  const subject = `format v4 ${event.type} at seq ${event.seq}`
+  const data = event.data
+  if (!isSessionFormatJsonObject(data)) throw new SessionFormatError(`${subject} data must be an object`)
+  const callId = data['callId']
+  if (callId !== undefined && (typeof callId !== 'string' || callId.length === 0)) {
+    throw new SessionFormatError(`${subject} requires a nonempty callId when present`)
+  }
+}

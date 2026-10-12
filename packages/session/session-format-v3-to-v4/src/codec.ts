@@ -8,7 +8,7 @@ import { assertV4RetiredSyntax } from './retired-syntax.ts'
 import { assertV4SystemMessageFields } from './system-message.ts'
 import { assertV4DeveloperData } from './developer.ts'
 import { assertV4ForkResult } from './fork-result.ts'
-import { assertV4ToolResultMessage } from './tool-role.ts'
+import { assertV4ToolResultMessage, assertV4ToolCallMessage } from './tool-role.ts'
 import { assertReleasedV4Header } from './validation.ts'
 
 function physicalV2(value: unknown): SessionFormatHeader {
@@ -68,7 +68,12 @@ export function assertV4RowAdmission(row: unknown, knownEventTypes?: ReadonlySet
   assertV4SourceRowAdmission(row)
   assertV4RetiredSyntax(row)
   assertV4SystemMessageFields(row)
-  if (!isSessionFormatJsonObject(row) || row['type'] !== 'tool/result') return
+  if (!isSessionFormatJsonObject(row)) return
+  if (row['type'] === 'tool/call') {
+    assertV4ToolCallMessage(row as unknown as SessionFormatEvent)
+    return
+  }
+  if (row['type'] !== 'tool/result') return
   const event = row as unknown as SessionFormatEvent
   assertV4ToolResultMessage(event)
   assertV4ForkResult(event)

@@ -3,7 +3,7 @@ import type { SessionFormatEvent, SessionFormatHeader, SessionFormatJsonObject }
 import { SessionFormatEventCollector, SessionFormatUnsupportedMigrationError } from '@deepseek-ai/dsh-session-format'
 import { createToolResultMessage, ToolCallId } from '@deepseek-ai/dsh-llm'
 import { createSessionFormatV3ToV4, releasedV4SessionFormatCodec, restoreReleasedV4Artifact, sessionFormatV3ToV4 } from '../src/index.ts'
-import { assertV4ToolResultMessage, liftToolResult } from '../src/tool-role.ts'
+import { assertV4ToolResultMessage, assertV4ToolCallMessage, liftToolResult } from '../src/tool-role.ts'
 
 const header = { version: 4, id: 'tool-role', createdAt: 1, isSeeded: false, delegationDepth: 0 }
 
@@ -454,5 +454,30 @@ describe('native tool-result validation', () => {
         content: [{ type: 'tool-result', toolCallId: 'call-1', content: [] }],
       }))
     }).toThrow(/must not contain a released tool-result wrapper/)
+  })
+})
+
+describe('native tool-call admission', () => {
+  function call(overrides: SessionFormatJsonObject = {}): SessionFormatEvent {
+    return event(0, 'tool/call', { turn: 1, step: 1, callId: 'call-1', name: 'read', arguments: '{}', ...overrides })
+  }
+  function raw(data: unknown): SessionFormatEvent {
+    return { type: 'tool/call', seq: 0, time: 1, data } as SessionFormatEvent
+  }
+
+  it('accepts a call with a nonempty callId and ignores rows of other event types', () => {
+    expect(() => { assertV4ToolCallMessage(call()) }).not.toThrow()
+    expect(() => { assertV4ToolCallMessage(event(0, 'user/message', { role: 'user', content: [] })) }).not.toThrow()
+  })
+
+  it('refuses data that is not an object', () => {
+    expect(() => { assertV4ToolCallMessage(raw('nope')) }).toThrow(/data must be an object/)
+  })
+
+  it('refuses a present-but-empty callId while tolerating an absent callId', () => {
+    expect(() => { assertV4ToolCallMessage(call({ callId: '' })) }).toThrow(/nonempty callId/)
+    expect(() => { assertV4ToolCallMessage(call({ callId: 7 })) }).toThrow(/nonempty callId/)
+    const withoutCallId: SessionFormatJsonObject = { turn: 1, step: 1, name: 'read', arguments: '{}' }
+    expect(() => { assertV4ToolCallMessage(event(0, 'tool/call', withoutCallId)) }).not.toThrow()
   })
 })

@@ -68,6 +68,19 @@ describe('V4 framing and restoration', () => {
     expect(() => { assertV4RowAdmission(wrapperRow) }).toThrow(/first-class message/)
   })
 
+  it('rejects a tool/call with a present-but-empty callId at admission', () => {
+    const degenerate: SessionFormatEvent = {
+      type: 'tool/call', seq: 5, time: 6, data: { turn: 1, step: 1, callId: '', name: 'read', arguments: '{}' },
+    }
+    expect(() => { assertV4RowAdmission(degenerate) }).toThrow(/nonempty callId/)
+    expect(() => releasedV4SessionFormatCodec.encodeEvent(degenerate)).toThrow(/nonempty callId/)
+    // A call that omits callId (opacity/recovery payloads) still passes admission.
+    const opaque: SessionFormatEvent = {
+      type: 'tool/call', seq: 6, time: 7, data: { arguments: '{"opaque": true}', metadata: { x: 1 } },
+    }
+    expect(() => { assertV4RowAdmission(opaque) }).not.toThrow()
+  })
+
   it('retains predecessor and future delivery generations without activating their watermarks', () => {
     for (const version of [undefined, 0, 1, 2, 3, 5]) {
       const marker = { ...delivery(version, 'foreign'), data: { ...delivery(version).data as SessionFormatJsonObject, sessionId: 'foreign', throughSeq: 500 } }
